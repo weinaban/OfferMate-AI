@@ -1,8 +1,8 @@
 # OfferMate AI
 
-OfferMate AI 是一个面向 PC 端的智能招聘平台，业务形态参考 Boss 直聘，覆盖求职者、招聘者、管理员三类角色。项目以 Spring Boot 单体后端为核心，配套 Vue3 前端，实现了从企业维护、岗位发布、简历管理、岗位投递、实时沟通、面试邀请到后台审核的招聘业务闭环，并结合 AI 能力提供简历优化、岗位匹配和模拟面试等求职辅助功能。
+OfferMate AI 是一个面向 PC 端的智能招聘平台，覆盖求职者、招聘者和管理员三类角色。项目围绕招聘业务主流程展开，实现了企业信息维护、岗位发布、简历管理、岗位投递、实时聊天、面试邀请、通知中心、后台审核等能力，并接入 AI 能力辅助简历优化、岗位匹配和模拟面试。
 
-本项目适合作为 Java 后端秋招展示项目，重点体现：业务建模、权限控制、缓存与消息队列、全文搜索、WebSocket 实时通信、对象存储、AI 接入和 Docker 化部署能力。
+项目采用前后端分离架构，后端基于 Spring Boot 3.3.x 和 Java 17，前端基于 Vue3、Vite 和 Element Plus。后端同时结合 Redis、RabbitMQ、Elasticsearch、MinIO、WebSocket、Spring AI、LangChain4j 等组件，尽量贴近真实业务系统的工程实践。
 
 ## 技术栈
 
@@ -40,56 +40,44 @@ OfferMate AI 是一个面向 PC 端的智能招聘平台，业务形态参考 Bo
 
 ## 核心功能
 
-### 用户与权限
+### 求职者端
 
-- 用户注册、登录、退出
-- JWT 登录校验与 Token 黑名单
-- 求职者、招聘者、管理员三类角色权限控制
-- ThreadLocal 保存当前登录用户上下文
+- 注册、登录、退出
+- 创建和维护在线简历
+- 设置默认简历
+- 浏览、筛选和搜索岗位
+- 投递岗位并查看投递进度
+- 接收面试邀请并进行接受或拒绝操作
+- 与招聘者进行 WebSocket 实时聊天
+- 使用 AI 简历优化、岗位匹配、模拟面试等功能
 
-### 招聘业务闭环
+### 招聘者端
 
-- 招聘者维护企业信息
-- 招聘者发布、修改、下架岗位
-- 求职者在线创建简历、设置默认简历
-- 求职者投递岗位，防重复投递
-- 招聘者查看收到的投递并更新投递状态
-- 面试邀请发送、接受、拒绝、取消
-- 管理后台审核企业和岗位
+- 维护企业资料
+- 发布、修改、下架岗位
+- 查看岗位收到的投递
+- 修改投递状态
+- 基于投递记录发送面试邀请
+- 与求职者实时沟通
+- 使用 AI 生成岗位描述和面试题
 
-### 实时聊天
+### 管理端
 
-- WebSocket 实时聊天
-- JWT 校验 WebSocket 连接
-- 聊天会话与消息落库
-- 未读消息统计
-- 会话列表展示对方名称、头像、公司、岗位等信息
-
-### AI 求职助手
-
-- AI 简历优化
-- AI 分模块优化技能、项目经历、自我评价
-- AI 生成岗位描述
-- AI 生成面试题
-- LangChain4j 岗位匹配分析
-- LangChain4j 模拟面试多轮问答、评分与报告
-- AI 调用日志与 Redis 每日限流
-
-### 搜索、文件与通知
-
-- Elasticsearch 岗位全文搜索
-- Redis 岗位缓存、投递锁、Token 黑名单、聊天未读缓存
-- RabbitMQ 异步通知与 AI 日志异步写入
-- MinIO 文件上传，支持头像、企业 Logo、附件简历预留
-- 操作日志与审计日志
+- 用户分页查询与启用/禁用
+- 企业认证审核
+- 岗位审核
+- 操作日志查询
 
 ## 项目亮点
 
-- **招聘业务闭环完整**：覆盖用户、企业、岗位、简历、投递、聊天、面试、通知、后台审核等核心流程。
-- **工程化能力充分**：接入 Redis、RabbitMQ、Elasticsearch、MinIO、WebSocket，并提供统一异常处理、参数校验、审计日志和权限边界校验。
-- **AI 能力贴合业务**：不是简单聊天接口，而是围绕简历优化、岗位匹配、面试题生成和模拟面试构建实际场景。
-- **可部署性强**：支持本地启动和 Docker Compose 部署，适合演示、二次开发和学习。
-- **后端结构清晰**：Controller、Service、Mapper、DTO、VO 分层明确，保持黑马项目风格，便于阅读和扩展。
+- **招聘业务闭环完整**：覆盖企业、岗位、简历、投递、沟通、面试邀请、通知和后台审核等核心流程。
+- **实时沟通能力**：基于 WebSocket 实现聊天会话、消息落库、未读数统计和在线推送。
+- **AI 求职助手**：结合 Spring AI 与 LangChain4j，实现简历优化、岗位匹配、面试题生成和多轮模拟面试。
+- **搜索体验优化**：使用 Elasticsearch 构建岗位搜索能力，支持关键词、城市、薪资、学历、经验、行业等条件筛选。
+- **异步通知设计**：使用 RabbitMQ 解耦投递通知、面试通知、审核通知和 AI 日志写入。
+- **缓存与限流**：使用 Redis 实现岗位缓存、Token 黑名单、防重复投递、AI 调用限流和聊天未读数缓存。
+- **文件对象存储**：使用 MinIO 存储头像、企业 Logo，并预留附件简历上传能力。
+- **工程化补充**：包含参数校验、统一异常处理、统一返回结构、操作日志、权限边界校验和配置示例。
 
 ## 系统架构
 
@@ -100,21 +88,21 @@ Vue3 PC Web
    v
 Spring Boot Backend
    |
-   |-- MySQL：核心业务数据
-   |-- Redis：缓存、限流、黑名单、防重复操作
-   |-- RabbitMQ：异步通知、AI 日志
-   |-- Elasticsearch：岗位搜索
-   |-- MinIO：头像、Logo、附件对象存储
-   |-- DashScope / Qwen：Spring AI 与 LangChain4j AI 能力
+   |-- MySQL            核心业务数据
+   |-- Redis            缓存、限流、黑名单、防重复操作
+   |-- RabbitMQ         异步通知、AI 日志
+   |-- Elasticsearch    岗位搜索
+   |-- MinIO            文件对象存储
+   |-- DashScope/Qwen   AI 能力
 ```
 
-更多架构说明见：[docs/系统架构.md](docs/系统架构.md)
+更多说明见：[docs/系统架构.md](docs/系统架构.md)
 
-## 本地启动方式
+## 本地运行
 
-### 1. 准备基础环境
+### 环境要求
 
-- JDK 17
+- JDK 17+
 - Maven 3.8+
 - Node.js 18+
 - MySQL 8.x
@@ -123,7 +111,9 @@ Spring Boot Backend
 - Elasticsearch 8.x
 - MinIO
 
-### 2. 初始化数据库
+### 1. 初始化数据库
+
+先创建数据库：
 
 ```sql
 create database if not exists offermate
@@ -131,47 +121,44 @@ create database if not exists offermate
   collate utf8mb4_unicode_ci;
 ```
 
-执行初始化 SQL：
+导入初始化脚本：
 
 ```bash
-mysql --default-character-set=utf8mb4 -h localhost -P 3306 -u root -p offermate < offermate-server/src/main/resources/sql/offermate.sql
+mysql --default-character-set=utf8mb4 -h <MYSQL_HOST> -P <MYSQL_PORT> -u <MYSQL_USER> -p <MYSQL_DATABASE> < offermate-server/src/main/resources/sql/offermate.sql
 ```
 
-### 3. 配置后端
+示例中的 `<MYSQL_HOST>`、`<MYSQL_PORT>`、`<MYSQL_USER>`、`<MYSQL_DATABASE>` 请替换为自己的本地配置。
 
-公开仓库只提交 `application.yml` 和 `application-example.yml`，本地真实配置放在 `application-dev.yml`，该文件已加入 `.gitignore`。
+### 2. 准备后端配置
 
-复制示例配置：
+后端提供了一份示例配置：
+
+```text
+offermate-server/src/main/resources/application-example.yml
+```
+
+复制为本地开发配置：
 
 ```bash
 cp offermate-server/src/main/resources/application-example.yml offermate-server/src/main/resources/application-dev.yml
 ```
 
-然后修改 `offermate-server/src/main/resources/application-dev.yml`，重点配置：
+然后根据自己的环境填写 MySQL、Redis、RabbitMQ、Elasticsearch、MinIO 和 AI 服务配置。
 
-- MySQL
-- Redis
-- RabbitMQ
-- Elasticsearch
-- MinIO
-- DashScope API Key
-
-建议使用环境变量保存密钥，不要把真实 API Key、数据库密码、JWT Secret、MinIO SecretKey 等敏感信息提交到 GitHub。
-
-### 4. 启动后端
+### 3. 启动后端
 
 ```bash
 cd offermate-server
 mvn spring-boot:run
 ```
 
-默认后端地址：
+默认地址：
 
 ```text
 http://localhost:8080
 ```
 
-### 5. 启动前端
+### 4. 启动前端
 
 ```bash
 cd offermate-web
@@ -179,26 +166,17 @@ npm install
 npm run dev
 ```
 
-默认前端地址：
+默认地址：
 
 ```text
 http://localhost:5173
 ```
 
-## Docker Compose 部署方式
+## Docker Compose 部署
 
-项目支持使用 Docker Compose 编排 MySQL、Redis、RabbitMQ、Elasticsearch、MinIO、后端服务和 Nginx 前端服务。部署前请确认已安装：
+项目可以使用 Docker Compose 编排 MySQL、Redis、RabbitMQ、Elasticsearch、MinIO、后端服务和 Nginx 前端服务。部署说明见：
 
-- Docker
-- Docker Compose
-
-推荐流程：
-
-```bash
-docker compose up -d
-```
-
-部署配置说明见：[docs/部署说明.md](docs/部署说明.md)
+[docs/部署说明.md](docs/部署说明.md)
 
 ## 演示账号
 
@@ -208,80 +186,41 @@ docker compose up -d
 | 招聘者 | recruiter1 | 123456 | 企业信息、岗位发布、投递处理、面试邀请 |
 | 管理员 | admin | 123456 | 用户管理、企业审核、岗位审核、操作日志 |
 
-> 实际演示账号以数据库初始化数据为准。
-
-## 页面截图
-
-截图建议放在 `docs/images/` 目录。
-
-### 首页
-
-![首页](docs/images/home.png)
-
-### 岗位详情
-
-![岗位详情](docs/images/job-detail.png)
-
-### 简历管理
-
-![简历管理](docs/images/resume.png)
-
-### 实时聊天
-
-![实时聊天](docs/images/chat.png)
-
-### AI 模拟面试
-
-![AI 模拟面试](docs/images/ai-interview.png)
-
-### 管理后台
-
-![管理后台](docs/images/admin.png)
+> 演示账号仅用于本地初始化数据和功能体验，实际部署时请自行调整。
 
 ## 目录结构
 
 ```text
 OfferMate-AI
-├── offermate-server                 # Spring Boot 后端
+├── offermate-server
 │   ├── src/main/java/com/offermate
-│   │   ├── controller               # 接口层
-│   │   ├── service                  # 业务层
-│   │   ├── mapper                   # MyBatis-Plus Mapper
-│   │   ├── entity                   # 数据库实体
-│   │   ├── dto                      # 请求 DTO
-│   │   ├── vo                       # 响应 VO
-│   │   ├── config                   # 配置类
-│   │   ├── interceptor              # JWT 拦截器
-│   │   ├── websocket                # WebSocket 聊天
-│   │   ├── mq                       # RabbitMQ 消息
-│   │   ├── es                       # Elasticsearch 搜索
-│   │   └── util                     # 工具类
+│   │   ├── controller       接口层
+│   │   ├── service          业务层
+│   │   ├── mapper           数据访问层
+│   │   ├── entity           数据库实体
+│   │   ├── dto              请求对象
+│   │   ├── vo               响应对象
+│   │   ├── config           配置类
+│   │   ├── interceptor      登录拦截器
+│   │   ├── websocket        实时聊天
+│   │   ├── mq               RabbitMQ 消息
+│   │   ├── es               Elasticsearch 搜索
+│   │   └── util             工具类
 │   └── src/main/resources
-│       ├── application.yml          # 公共配置，提交 GitHub
-│       ├── application-example.yml  # 示例配置，提交 GitHub
-│       ├── application-dev.yml      # 本地真实配置，不提交 GitHub
+│       ├── application.yml
+│       ├── application-example.yml
 │       └── sql/offermate.sql
-├── offermate-web                    # Vue3 前端
+├── offermate-web
 │   ├── src
 │   ├── package.json
 │   └── vite.config.js
-└── docs                             # 项目文档
+└── docs
     ├── 项目介绍.md
     ├── 系统架构.md
     ├── 接口说明.md
     ├── 数据库设计.md
     └── 部署说明.md
 ```
-
-## 后续规划
-
-- 完善 Docker Compose 一键部署脚本和 Nginx 配置模板
-- 补充接口自动化测试和核心业务单元测试
-- 增加企业端数据看板
-- 增加简历附件解析和简历完整度分析
-- 优化 Elasticsearch 中文分词和搜索相关度
-- 增加通知中心 WebSocket 实时推送
-- 完善 CI/CD 流程
 
 ## 文档
 
@@ -290,3 +229,13 @@ OfferMate-AI
 - [接口说明](docs/接口说明.md)
 - [数据库设计](docs/数据库设计.md)
 - [部署说明](docs/部署说明.md)
+
+## 后续规划
+
+- 补充更完整的 Docker Compose 和 Nginx 模板
+- 增加核心业务接口自动化测试
+- 优化 Elasticsearch 中文分词和相关度排序
+- 增加简历附件解析能力
+- 扩展通知中心实时推送
+- 完善 CI/CD 流程
+
