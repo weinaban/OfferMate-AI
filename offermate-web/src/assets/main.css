@@ -1,0 +1,25 @@
+:root {
+  --om-primary: #00bebd;
+  --om-primary-dark: #009b9a;
+  --om-text: #1f2937;
+  --om-muted: #6b7280;
+  --om-border: #e5e7eb;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--om-primary);
+  --el-button-border-color: var(--om-primary);
+  --el-button-hover-bg-color: var(--om-primary-dark);
+  --el-button-hover-border-color: var(--om-primary-dark);
+  --el-button-active-bg-color: var(--om-primary-dark);
+  --el-button-active-border-color: var(--om-primary-dark);
+}
+
+.el-radio__input.is-checked .el-radio__inner,
+.el-input__wrapper.is-focus {
+  --el-color-primary: var(--om-primary);
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+  color: var(--om-primary);
+}
