@@ -2,6 +2,7 @@ package com.offermate.service.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
@@ -179,8 +180,8 @@ public class JobEsServiceImpl implements JobEsService {
 
         try {
             List<Query> filters = new ArrayList<>();
-            filters.add(Query.of(q -> q.term(t -> t.field("status").value(ONLINE_STATUS))));
-            filters.add(Query.of(q -> q.term(t -> t.field("auditStatus").value(AUDIT_PASS))));
+            filters.add(Query.of(q -> q.term(t -> t.field("status").value(FieldValue.of(ONLINE_STATUS)))));
+            filters.add(Query.of(q -> q.term(t -> t.field("auditStatus").value(FieldValue.of(AUDIT_PASS)))));
             addTermFilter(filters, "city", queryDTO.getCity());
             addTermFilter(filters, "education", queryDTO.getEducation());
             addTermFilter(filters, "experience", queryDTO.getExperience());

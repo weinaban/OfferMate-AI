@@ -21,6 +21,9 @@ public class PageUtils {
     }
 
     public static String jobSearchSort(String sort) {
+        if ("salaryDesc".equals(sort)) {
+            return "salary";
+        }
         if ("latest".equals(sort) || "salary".equals(sort) || "relevance".equals(sort)) {
             return sort;
         }
