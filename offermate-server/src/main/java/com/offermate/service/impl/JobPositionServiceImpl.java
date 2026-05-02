@@ -16,8 +16,12 @@ import com.offermate.dto.JobUpdateDTO;
 import com.offermate.dto.LoginUserDTO;
 import com.offermate.entity.Company;
 import com.offermate.entity.JobPosition;
+import com.offermate.entity.Notification;
+import com.offermate.entity.SysUser;
 import com.offermate.exception.BusinessException;
 import com.offermate.mapper.JobPositionMapper;
+import com.offermate.mapper.NotificationMapper;
+import com.offermate.mapper.SysUserMapper;
 import com.offermate.service.CompanyService;
 import com.offermate.service.JobEsService;
 import com.offermate.service.JobPositionService;
@@ -34,6 +38,7 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -43,13 +48,17 @@ public class JobPositionServiceImpl extends ServiceImpl<JobPositionMapper, JobPo
 
     private static final int RECRUITER_ROLE = 2;
     private static final int ADMIN_ROLE = 3;
+    private static final int NORMAL_STATUS = 1;
     private static final int ONLINE_STATUS = 1;
     private static final int OFFLINE_STATUS = 0;
+    private static final int SYSTEM_NOTICE_TYPE = 5;
 
     private final CompanyService companyService;
     private final JobEsService jobEsService;
     private final RedisCacheService redisCacheService;
     private final ObjectMapper objectMapper;
+    private final SysUserMapper sysUserMapper;
+    private final NotificationMapper notificationMapper;
 
     @Override
     public void createJob(JobCreateDTO dto) {
@@ -79,6 +88,7 @@ public class JobPositionServiceImpl extends ServiceImpl<JobPositionMapper, JobPo
         save(job);
         clearJobPageCache();
         syncJobToEs(job.getId());
+        notifyAdminsJobAudit(job);
     }
 
     @Override
@@ -383,6 +393,26 @@ public class JobPositionServiceImpl extends ServiceImpl<JobPositionMapper, JobPo
             jobEsService.deleteJob(id);
         } catch (Exception e) {
             log.warn("ES岗位删除调用失败 jobId={}", id, e);
+        }
+    }
+
+    private void notifyAdminsJobAudit(JobPosition job) {
+        try {
+            List<SysUser> admins = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getRole, ADMIN_ROLE)
+                    .eq(SysUser::getStatus, NORMAL_STATUS));
+            for (SysUser admin : admins) {
+                Notification notification = new Notification();
+                notification.setUserId(admin.getId());
+                notification.setTitle("岗位待审核");
+                notification.setContent("岗位【" + job.getTitle() + "】已发布，请及时审核。");
+                notification.setType(SYSTEM_NOTICE_TYPE);
+                notification.setIsRead(0);
+                notification.setCreateTime(LocalDateTime.now());
+                notificationMapper.insert(notification);
+            }
+        } catch (Exception e) {
+            log.warn("管理员岗位审核通知写入失败 jobId={}", job.getId(), e);
         }
     }
 }

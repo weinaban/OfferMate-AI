@@ -7,29 +7,41 @@ import com.offermate.dto.CompanySaveDTO;
 import com.offermate.dto.LoginUserDTO;
 import com.offermate.entity.Company;
 import com.offermate.entity.JobPosition;
+import com.offermate.entity.Notification;
+import com.offermate.entity.SysUser;
 import com.offermate.exception.BusinessException;
 import com.offermate.mapper.CompanyMapper;
 import com.offermate.mapper.JobPositionMapper;
+import com.offermate.mapper.NotificationMapper;
+import com.offermate.mapper.SysUserMapper;
 import com.offermate.service.CompanyService;
 import com.offermate.util.UserContext;
 import com.offermate.vo.CompanyVO;
 import com.offermate.vo.JobPageVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CompanyServiceImpl extends ServiceImpl<CompanyMapper, Company> implements CompanyService {
 
     private static final int RECRUITER_ROLE = 2;
+    private static final int ADMIN_ROLE = 3;
+    private static final int NORMAL_STATUS = 1;
     private static final int WAIT_AUDIT_STATUS = 0;
     private static final int ONLINE_STATUS = 1;
+    private static final int SYSTEM_NOTICE_TYPE = 5;
     private static final int PUBLIC_JOB_LIMIT = 20;
 
     private final JobPositionMapper jobPositionMapper;
+    private final SysUserMapper sysUserMapper;
+    private final NotificationMapper notificationMapper;
 
     @Override
     public CompanyVO getMyCompany() {
@@ -63,6 +75,9 @@ public class CompanyServiceImpl extends ServiceImpl<CompanyMapper, Company> impl
             save(company);
         } else {
             updateById(company);
+        }
+        if (Integer.valueOf(WAIT_AUDIT_STATUS).equals(company.getAuditStatus())) {
+            notifyAdminsCompanyAudit(company);
         }
     }
 
@@ -155,5 +170,25 @@ public class CompanyServiceImpl extends ServiceImpl<CompanyMapper, Company> impl
         vo.setIndustry(company.getIndustry());
         vo.setScale(company.getScale());
         return vo;
+    }
+
+    private void notifyAdminsCompanyAudit(Company company) {
+        try {
+            List<SysUser> admins = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getRole, ADMIN_ROLE)
+                    .eq(SysUser::getStatus, NORMAL_STATUS));
+            for (SysUser admin : admins) {
+                Notification notification = new Notification();
+                notification.setUserId(admin.getId());
+                notification.setTitle("企业认证待审核");
+                notification.setContent("企业【" + company.getCompanyName() + "】提交了认证信息，请及时审核。");
+                notification.setType(SYSTEM_NOTICE_TYPE);
+                notification.setIsRead(0);
+                notification.setCreateTime(LocalDateTime.now());
+                notificationMapper.insert(notification);
+            }
+        } catch (Exception e) {
+            log.warn("管理员企业审核通知写入失败 companyId={}", company.getId(), e);
+        }
     }
 }

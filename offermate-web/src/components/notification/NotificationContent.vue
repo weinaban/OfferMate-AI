@@ -198,6 +198,13 @@ function getNotificationTarget(item) {
   const role = Number(userStore.userInfo?.role)
   const type = normalizeType(item.type)
 
+  if (role === 3) {
+    const adminTarget = getAdminNotificationTarget(item)
+    if (adminTarget) {
+      return adminTarget
+    }
+  }
+
   if (role === 2 && type === 'delivery') {
     return '/company/deliveries'
   }
@@ -210,7 +217,52 @@ function getNotificationTarget(item) {
     return '/company/jobs'
   }
 
-  if (role === 3 && type === 'audit') {
+  return ''
+}
+
+function getAdminNotificationTarget(item) {
+  const source = [
+    item.module,
+    item.businessType,
+    item.bizType,
+    item.targetType,
+    item.entityType,
+    item.resourceType,
+    item.auditType,
+    item.title,
+    item.content
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  if (
+    item.jobId ||
+    item.jobAuditId ||
+    source.includes('job') ||
+    source.includes('position') ||
+    source.includes('岗位待审核') ||
+    source.includes('职位待审核') ||
+    source.includes('岗位审核') ||
+    source.includes('职位审核') ||
+    source.includes('岗位') ||
+    source.includes('职位')
+  ) {
+    return '/admin/jobs'
+  }
+
+  if (
+    item.companyId ||
+    item.companyAuditId ||
+    source.includes('company') ||
+    source.includes('enterprise') ||
+    source.includes('企业待审核') ||
+    source.includes('公司待审核') ||
+    source.includes('企业审核') ||
+    source.includes('公司审核') ||
+    source.includes('企业') ||
+    source.includes('公司')
+  ) {
     return '/admin/companies'
   }
 
