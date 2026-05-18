@@ -48,12 +48,28 @@ ai:
         temperature: ${AI_TEMPERATURE:0.7}
 
 langchain4j:
-  qwen:
-    api-key: ${AI_API_KEY:your_ai_api_key}
-    base-url: ${AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
-    model-name: ${AI_MODEL:qwen-plus}
-    temperature: ${AI_TEMPERATURE:0.7}
-    max-tokens: ${AI_MAX_TOKENS:2000}
+  community:
+    dashscope:
+      chat-model:
+        api-key: ${AI_API_KEY:your_ai_api_key}
+        model-name: ${AI_MODEL:qwen-plus}
+        temperature: ${AI_TEMPERATURE:0.7}
+        max-tokens: ${AI_MAX_TOKENS:2000}
+      embedding-model:
+        api-key: ${AI_API_KEY:your_ai_api_key}
+        model-name: ${AI_EMBEDDING_MODEL:text-embedding-v2}
+
+offermate:
+  ai:
+    rag:
+      enabled: ${AI_RAG_ENABLED:true}
+      documents-path: ${AI_RAG_DOCS:classpath:documents/}
+      chunk-size: 300
+      chunk-overlap: 30
+      max-results: 3
+      min-score: 0.6
+    memory:
+      max-messages: 30
 
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}

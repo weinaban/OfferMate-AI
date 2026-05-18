@@ -3,6 +3,7 @@ package com.offermate.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.offermate.ai.InterviewAssistant;
 import com.offermate.common.Result;
 import com.offermate.dto.AiInterviewAnswerDTO;
 import com.offermate.dto.AiInterviewSessionCreateDTO;
@@ -16,6 +17,7 @@ import com.offermate.entity.JobPosition;
 import com.offermate.entity.Resume;
 import com.offermate.exception.BusinessException;
 import com.offermate.mapper.AiCallLogMapper;
+import com.offermate.mapper.AiChatMemoryMapper;
 import com.offermate.mapper.AiInterviewMessageMapper;
 import com.offermate.mapper.AiInterviewSessionMapper;
 import com.offermate.mq.RabbitMQProducer;
@@ -32,7 +34,7 @@ import com.offermate.vo.AiInterviewQuestionVO;
 import com.offermate.vo.AiInterviewReportVO;
 import com.offermate.vo.AiInterviewSessionVO;
 import com.offermate.vo.AiJobMatchVO;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,9 +42,17 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+/**
+ * AI 模拟面试核心业务。
+ * <p>
+ * 模型 / Memory / RAG 全部由 langchain4j-spring-boot-starter 自动装配：
+ * <ul>
+ *   <li>{@link ChatModel}：DashScope qwen-plus，无状态调用（岗位匹配、面试报告）</li>
+ *   <li>{@link InterviewAssistant}：声明式 @AiService，串联 Memory + RAG，用于多轮面试问答</li>
+ * </ul>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -60,7 +70,8 @@ public class LangChainAiServiceImpl implements LangChainAiService {
     private static final String INTERVIEW_ANSWER_SCORE = "INTERVIEW_ANSWER_SCORE";
     private static final String INTERVIEW_REPORT = "INTERVIEW_REPORT";
 
-    private final ChatLanguageModel qwenChatLanguageModel;
+    private final ChatModel chatModel;
+    private final InterviewAssistant interviewAssistant;
     private final ObjectMapper objectMapper;
     private final ResumeService resumeService;
     private final JobPositionService jobPositionService;
@@ -68,6 +79,7 @@ public class LangChainAiServiceImpl implements LangChainAiService {
     private final AiLimitService aiLimitService;
     private final AiInterviewSessionMapper aiInterviewSessionMapper;
     private final AiInterviewMessageMapper aiInterviewMessageMapper;
+    private final AiChatMemoryMapper aiChatMemoryMapper;
     private final AiCallLogMapper aiCallLogMapper;
     private final RabbitMQProducer rabbitMQProducer;
 
@@ -88,7 +100,7 @@ public class LangChainAiServiceImpl implements LangChainAiService {
         String prompt = buildJobMatchPrompt(resume, job, company);
         AiSecurityUtils.checkPromptLength(prompt);
         aiLimitService.checkAndIncrement(loginUser.getUserId());
-        String result = callAiAndSaveLog(loginUser.getUserId(), JOB_MATCH, prompt);
+        String result = callChatModelAndLog(loginUser.getUserId(), JOB_MATCH, prompt);
         return parseJobMatchResult(result);
     }
 
@@ -132,12 +144,23 @@ public class LangChainAiServiceImpl implements LangChainAiService {
         JobPosition job = getJob(session.getJobId());
         Resume resume = session.getResumeId() == null ? null : resumeService.getById(session.getResumeId());
 
-        List<AiInterviewMessage> messages = listRecentMessages(sessionId);
         int round = countUserAnswers(sessionId) + 1;
-        String prompt = buildQuestionPrompt(job, resume, messages);
-        AiSecurityUtils.checkPromptLength(prompt);
+        String userMessage = buildQuestionUserMessage(job, resume, round);
+        AiSecurityUtils.checkPromptLength(userMessage);
         aiLimitService.checkAndIncrement(loginUser.getUserId());
-        String question = cleanPlainText(callAiAndSaveLog(loginUser.getUserId(), INTERVIEW_QUESTION, prompt));
+
+        String question;
+        try {
+            question = cleanPlainText(interviewAssistant.askNextQuestion(sessionId, userMessage));
+        } catch (Exception e) {
+            log.error("LangChain4j 面试出题失败 sessionId={}", sessionId, e);
+            saveLog(loginUser.getUserId(), INTERVIEW_QUESTION, userMessage, AI_ERROR_MESSAGE);
+            throw new BusinessException(AI_ERROR_MESSAGE);
+        }
+        if (!StringUtils.hasText(question)) {
+            throw new BusinessException(AI_ERROR_MESSAGE);
+        }
+        saveLog(loginUser.getUserId(), INTERVIEW_QUESTION, userMessage, question);
 
         AiInterviewMessage message = new AiInterviewMessage();
         message.setSessionId(sessionId);
@@ -161,20 +184,33 @@ public class LangChainAiServiceImpl implements LangChainAiService {
             throw new BusinessException("回答内容不能为空");
         }
 
+        String answer = dto.getAnswer().trim();
         AiInterviewMessage userMessage = new AiInterviewMessage();
         userMessage.setSessionId(sessionId);
         userMessage.setRole(ROLE_USER);
-        userMessage.setContent(dto.getAnswer().trim());
+        userMessage.setContent(answer);
         userMessage.setCreateTime(LocalDateTime.now());
         aiInterviewMessageMapper.insert(userMessage);
 
         JobPosition job = getJob(session.getJobId());
         Resume resume = session.getResumeId() == null ? null : resumeService.getById(session.getResumeId());
-        List<AiInterviewMessage> messages = listRecentMessages(sessionId);
-        String prompt = buildAnswerScorePrompt(job, resume, messages, countUserAnswers(sessionId));
-        AiSecurityUtils.checkPromptLength(prompt);
+        int answerCount = countUserAnswers(sessionId);
+        String evaluatePrompt = buildAnswerUserMessage(job, resume, answer, answerCount);
+        AiSecurityUtils.checkPromptLength(evaluatePrompt);
         aiLimitService.checkAndIncrement(loginUser.getUserId());
-        String result = callAiAndSaveLog(loginUser.getUserId(), INTERVIEW_ANSWER_SCORE, prompt);
+
+        String result;
+        try {
+            result = interviewAssistant.evaluateAnswer(sessionId, evaluatePrompt);
+        } catch (Exception e) {
+            log.error("LangChain4j 面试评分失败 sessionId={}", sessionId, e);
+            saveLog(loginUser.getUserId(), INTERVIEW_ANSWER_SCORE, evaluatePrompt, AI_ERROR_MESSAGE);
+            throw new BusinessException(AI_ERROR_MESSAGE);
+        }
+        if (!StringUtils.hasText(result)) {
+            throw new BusinessException(AI_ERROR_MESSAGE);
+        }
+        saveLog(loginUser.getUserId(), INTERVIEW_ANSWER_SCORE, evaluatePrompt, result);
 
         AiInterviewAnswerResultVO vo = parseAnswerResult(result);
         vo.setSessionId(sessionId);
@@ -208,7 +244,7 @@ public class LangChainAiServiceImpl implements LangChainAiService {
         String prompt = buildReportPrompt(job, resume, messages);
         AiSecurityUtils.checkPromptLength(prompt);
         aiLimitService.checkAndIncrement(loginUser.getUserId());
-        String result = callAiAndSaveLog(loginUser.getUserId(), INTERVIEW_REPORT, prompt);
+        String result = callChatModelAndLog(loginUser.getUserId(), INTERVIEW_REPORT, prompt);
 
         AiInterviewReportVO vo = parseReportResult(result);
         vo.setSessionId(sessionId);
@@ -220,6 +256,8 @@ public class LangChainAiServiceImpl implements LangChainAiService {
         update.setStatus(SESSION_FINISHED);
         update.setUpdateTime(LocalDateTime.now());
         aiInterviewSessionMapper.updateById(update);
+
+        aiChatMemoryMapper.deleteById(sessionId);
         return vo;
     }
 
@@ -275,15 +313,6 @@ public class LangChainAiServiceImpl implements LangChainAiService {
         return session;
     }
 
-    private List<AiInterviewMessage> listRecentMessages(Long sessionId) {
-        List<AiInterviewMessage> messages = aiInterviewMessageMapper.selectList(new LambdaQueryWrapper<AiInterviewMessage>()
-                .eq(AiInterviewMessage::getSessionId, sessionId)
-                .orderByDesc(AiInterviewMessage::getCreateTime)
-                .last("limit 20"));
-        Collections.reverse(messages);
-        return messages;
-    }
-
     private List<AiInterviewMessage> listAllMessages(Long sessionId) {
         return aiInterviewMessageMapper.selectList(new LambdaQueryWrapper<AiInterviewMessage>()
                 .eq(AiInterviewMessage::getSessionId, sessionId)
@@ -304,30 +333,21 @@ public class LangChainAiServiceImpl implements LangChainAiService {
                 .set(AiInterviewSession::getUpdateTime, LocalDateTime.now()));
     }
 
-    private String callAi(String prompt) {
+    private String callChatModelAndLog(Long userId, String module, String prompt) {
+        String result;
         try {
-            String result = qwenChatLanguageModel.generate(prompt);
-            if (!StringUtils.hasText(result)) {
-                throw new BusinessException(AI_ERROR_MESSAGE);
-            }
-            return result;
-        } catch (BusinessException e) {
-            throw e;
+            result = chatModel.chat(prompt);
         } catch (Exception e) {
-            log.error("LangChain4j AI调用失败", e);
+            log.error("LangChain4j AI调用失败 module={}", module, e);
+            saveLog(userId, module, prompt, AI_ERROR_MESSAGE);
             throw new BusinessException(AI_ERROR_MESSAGE);
         }
-    }
-
-    private String callAiAndSaveLog(Long userId, String module, String prompt) {
-        try {
-            String result = callAi(prompt);
-            saveLog(userId, module, prompt, result);
-            return result;
-        } catch (BusinessException e) {
+        if (!StringUtils.hasText(result)) {
             saveLog(userId, module, prompt, AI_ERROR_MESSAGE);
-            throw e;
+            throw new BusinessException(AI_ERROR_MESSAGE);
         }
+        saveLog(userId, module, prompt, result);
+        return result;
     }
 
     private void saveLog(Long userId, String module, String prompt, String result) {
@@ -465,42 +485,20 @@ public class LangChainAiServiceImpl implements LangChainAiService {
                 + (resume == null ? "未提供简历信息。\n" : buildResumeInfo(resume));
     }
 
-    private String buildQuestionPrompt(JobPosition job, Resume resume, List<AiInterviewMessage> messages) {
-        return "你是资深 Java 后端面试官。\n"
-                + "请基于岗位信息、简历信息和历史问答，生成下一道面试题。\n"
-                + "要求：\n"
-                + "1. 一次只输出一个问题\n"
-                + "2. 问题要具体，不要泛泛而谈\n"
-                + "3. 可以围绕 Java、Spring Boot、MySQL、Redis、项目经历、业务场景追问\n"
-                + "4. 如果已经问过类似问题，不要重复\n"
-                + "5. 输出中文\n"
-                + "6. 不要输出评分，不要输出解析\n\n"
+    private String buildQuestionUserMessage(JobPosition job, Resume resume, int round) {
+        return "请基于以下岗位和简历，结合我们前面的对话，给我第 " + round + " 道面试题（只输出题目本身，纯文本）。\n\n"
                 + buildJobInfo(job, null)
                 + "\n"
-                + (resume == null ? "未提供简历信息。\n" : buildResumeInfo(resume))
-                + "\n历史上下文：\n"
-                + buildMessagesText(messages);
+                + (resume == null ? "未提供简历信息。\n" : buildResumeInfo(resume));
     }
 
-    private String buildAnswerScorePrompt(JobPosition job, Resume resume, List<AiInterviewMessage> messages, int answerCount) {
-        return "请根据当前面试问题、用户回答、岗位要求和历史上下文，对用户回答进行评分并给出追问。\n"
-                + "请严格按 JSON 输出，不要输出 Markdown，不要输出多余解释。\n\n"
-                + "JSON 格式：\n"
-                + "{\n"
-                + "  \"score\": 78,\n"
-                + "  \"comment\": \"评价\",\n"
-                + "  \"suggestion\": \"改进建议\",\n"
-                + "  \"followUpQuestion\": \"追问问题\",\n"
-                + "  \"finished\": false\n"
-                + "}\n"
-                + "要求：score 为 0-100 整数，comment 简要评价回答质量，suggestion 给出可执行改进建议。\n"
-                + "如果已经完成 5 轮以上，可以 finished = true。\n"
+    private String buildAnswerUserMessage(JobPosition job, Resume resume, String answer, int answerCount) {
+        return "请对我刚才的回答进行打分并给出追问。\n"
                 + "当前已回答轮次：" + answerCount + "\n\n"
                 + buildJobInfo(job, null)
                 + "\n"
                 + (resume == null ? "未提供简历信息。\n" : buildResumeInfo(resume))
-                + "\n历史上下文：\n"
-                + buildMessagesText(messages);
+                + "\n我的回答：\n" + answer;
     }
 
     private String buildReportPrompt(JobPosition job, Resume resume, List<AiInterviewMessage> messages) {
