@@ -371,3 +371,12 @@ ALTER TABLE operation_log
     MODIFY error_msg TEXT COMMENT '错误信息',
     MODIFY cost_time BIGINT DEFAULT NULL COMMENT '耗时毫秒',
     MODIFY create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间';
+
+
+-- AI 多轮对话记忆持久化（LangChain4j ChatMemoryStore 后端表）
+CREATE TABLE IF NOT EXISTS ai_chat_memory (
+    memory_id   BIGINT       NOT NULL COMMENT 'memoryId，复用 ai_interview_session.id',
+    messages    MEDIUMTEXT   COMMENT 'LangChain4j ChatMessage 列表 JSON',
+    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (memory_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 多轮对话历史持久化表';
