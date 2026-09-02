@@ -2,7 +2,7 @@
 
 OfferMate AI 是一个面向 PC 端的智能招聘平台，覆盖求职者、招聘者和管理员三类角色。项目围绕招聘业务主流程展开，实现了企业信息维护、岗位发布、简历管理、岗位投递、实时聊天、面试邀请、通知中心、后台审核等能力，并接入 AI 能力辅助简历优化、岗位匹配和模拟面试。
 
-项目采用前后端分离架构，后端基于 Spring Boot 3.3.x 和 Java 17，前端基于 Vue3、Vite 和 Element Plus。后端同时结合 Redis、RabbitMQ、Elasticsearch、MinIO、WebSocket、Spring AI、LangChain4j 等组件，尽量贴近真实业务系统的工程实践。
+项目采用前后端分离架构，后端基于 Spring Boot 3.3.x 和 Java 17，前端基于 Vue3、Vite 和 Element Plus。后端同时结合 Redis、RabbitMQ、Elasticsearch、MinIO、WebSocket、Spring AI（智谱 AI GLM-4 / Embedding-3）等组件，尽量贴近真实业务系统的工程实践。
 
 ## 技术栈
 
@@ -18,8 +18,7 @@ OfferMate AI 是一个面向 PC 端的智能招聘平台，覆盖求职者、招
 - Elasticsearch 8.x
 - MinIO
 - WebSocket
-- Spring AI
-- LangChain4j
+- Spring AI（智谱 AI：GLM-4-flash / Embedding-3）
 
 **前端**
 
@@ -72,7 +71,7 @@ OfferMate AI 是一个面向 PC 端的智能招聘平台，覆盖求职者、招
 
 - **招聘业务闭环完整**：覆盖企业、岗位、简历、投递、沟通、面试邀请、通知和后台审核等核心流程。
 - **实时沟通能力**：基于 WebSocket 实现聊天会话、消息落库、未读数统计和在线推送。
-- **AI 求职助手**：结合 Spring AI 与 LangChain4j，实现简历优化、岗位匹配、面试题生成和多轮模拟面试。
+- **AI 智能助手**：基于 Spring AI 统一接入智谱大模型，实现简历优化、岗位匹配、面试题生成、RAG 题库检索和多轮模拟面试。
 - **搜索体验优化**：使用 Elasticsearch 构建岗位搜索能力，支持关键词、城市、薪资、学历、经验、行业等条件筛选。
 - **异步通知设计**：使用 RabbitMQ 解耦投递通知、面试通知、审核通知和 AI 日志写入。
 - **缓存与限流**：使用 Redis 实现岗位缓存、Token 黑名单、防重复投递、AI 调用限流和聊天未读数缓存。
@@ -93,7 +92,7 @@ Spring Boot Backend
    |-- RabbitMQ         异步通知、AI 日志
    |-- Elasticsearch    岗位搜索
    |-- MinIO            文件对象存储
-   |-- DashScope/Qwen   AI 能力
+   |-- 智谱 AI (ZhipuAI)  Spring AI 原生调用
 ```
 
 更多说明见：[docs/系统架构.md](docs/系统架构.md)
