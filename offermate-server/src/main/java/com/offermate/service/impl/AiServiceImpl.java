@@ -1,7 +1,6 @@
 package com.offermate.service.impl;
 
 import com.offermate.common.Result;
-import com.offermate.config.AiProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.offermate.dto.AiInterviewQuestionsDTO;
@@ -28,13 +27,11 @@ import com.offermate.vo.AiResumeSectionOptimizeVO;
 import com.offermate.vo.AiResultVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
 
 import java.util.List;
-import java.util.Map;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -53,7 +50,7 @@ public class AiServiceImpl implements AiService {
     private static final String SECTION_PROJECT_EXP = "projectExp";
     private static final String SECTION_SELF_INTRO = "selfIntro";
 
-    private final AiProperties aiProperties;
+    private final ChatModel chatModel;
     private final ObjectMapper objectMapper;
     private final AiCallLogMapper aiCallLogMapper;
     private final ResumeService resumeService;
@@ -226,32 +223,13 @@ public class AiServiceImpl implements AiService {
 
     private String callAi(String prompt) {
         try {
-            Map<String, Object> requestBody = Map.of(
-                    "model", aiProperties.getChat().getOptions().getModel(),
-                    "temperature", aiProperties.getChat().getOptions().getTemperature(),
-                    "messages", List.of(Map.of(
-                            "role", "user",
-                            "content", prompt
-                    ))
-            );
-
-            DashScopeChatResponse response = RestClient.create()
-                    .post()
-                    .uri(aiProperties.getBaseUrl())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .headers(headers -> headers.setBearerAuth(aiProperties.getApiKey()))
-                    .body(requestBody)
-                    .retrieve()
-                    .body(DashScopeChatResponse.class);
-
-            if (response == null || response.choices() == null || response.choices().isEmpty()
-                    || response.choices().get(0).message() == null
-                    || !StringUtils.hasText(response.choices().get(0).message().content())) {
+            String content = chatModel.call(prompt);
+            if (!StringUtils.hasText(content)) {
                 return AI_ERROR_MESSAGE;
             }
-            return response.choices().get(0).message().content();
+            return content;
         } catch (Exception e) {
-            log.error("AI调用失败", e);
+            log.error("Spring AI 调用失败", e);
             return AI_ERROR_MESSAGE;
         }
     }
@@ -591,14 +569,5 @@ public class AiServiceImpl implements AiService {
                 + "公司名称：" + dto.getCompanyName() + "\n"
                 + "所属行业：" + dto.getIndustry() + "\n"
                 + "公司规模：" + dto.getScale();
-    }
-
-    private record DashScopeChatResponse(List<Choice> choices) {
-    }
-
-    private record Choice(Message message) {
-    }
-
-    private record Message(String content) {
     }
 }

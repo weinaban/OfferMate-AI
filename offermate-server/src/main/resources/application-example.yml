@@ -25,51 +25,41 @@ spring:
           max-attempts: 3
           multiplier: 2
   ai:
-    openai:
-      api-key: ${AI_API_KEY:your_ai_api_key}
-      base-url: ${AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+    zhipuai:
+      api-key: ${AI_API_KEY:your_zhipuai_api_key}
       chat:
         options:
-          model: ${AI_MODEL:qwen-plus}
+          model: ${AI_MODEL:glm-4-flash}
           temperature: ${AI_TEMPERATURE:0.7}
+      embedding:
+        options:
+          model: ${AI_EMBEDDING_MODEL:embedding-3}
+          dimensions: 1024
+    vectorstore:
+      pgvector:
+        url: ${PGVECTOR_URL:jdbc:postgresql://localhost:5432/postgres}
+        username: ${PGVECTOR_USERNAME:root}
+        password: ${PGVECTOR_PASSWORD:1234}
+        driver-class-name: org.postgresql.Driver
+        dimensions: 1024
+        distance-type: COSINE
+        index-type: HNSW
+        initialize-schema: true
 
 offermate:
   jwt:
     secret: ${JWT_SECRET:your_jwt_secret}
     expire: ${JWT_EXPIRE:604800000}
-
-ai:
-  dashscope:
-    api-key: ${AI_API_KEY:your_ai_api_key}
-    base-url: ${AI_DASHSCOPE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions}
-    chat:
-      options:
-        model: ${AI_MODEL:qwen-plus}
-        temperature: ${AI_TEMPERATURE:0.7}
-
-langchain4j:
-  community:
-    dashscope:
-      chat-model:
-        api-key: ${AI_API_KEY:your_ai_api_key}
-        model-name: ${AI_MODEL:qwen-plus}
-        temperature: ${AI_TEMPERATURE:0.7}
-        max-tokens: ${AI_MAX_TOKENS:2000}
-      embedding-model:
-        api-key: ${AI_API_KEY:your_ai_api_key}
-        model-name: ${AI_EMBEDDING_MODEL:text-embedding-v2}
-
-offermate:
   ai:
     rag:
       enabled: ${AI_RAG_ENABLED:true}
       documents-path: ${AI_RAG_DOCS:classpath:documents/}
       chunk-size: 300
-      chunk-overlap: 30
       max-results: 3
       min-score: 0.6
     memory:
       max-messages: 30
+      redis-ttl-seconds: 1800
 
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
